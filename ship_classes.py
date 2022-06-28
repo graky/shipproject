@@ -1,5 +1,44 @@
 import random
 import pandas as pd
+import requests
+import json
+
+HEADERS = {
+    "authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2MmJhZjZhNmRjM2UwYTAwMTA2ZGI1ZjEiLCJzdWIiOiI1ZTc1MDMyMWJiNWE0MzA3NTk5YmFlNWUiLCJncnAiOiI1ZTc1MDMyMGJiNWE0M2UyOTk5YmFlNTkiLCJvcmciOiI1ZTc1MDMyMGJiNWE0M2UyOTk5YmFlNTkiLCJsaWMiOnRydWUsInVzZyI6ImFwaSIsImZ1bGwiOmZhbHNlLCJyaWdodHMiOjEuNSwiaWF0IjoxNjU2NDIwMDA2LCJleHAiOjE2NjE4OTMyMDB9.WpYPc2_MLmF8VkNLAzkRhmY0LJrba96ynz8jA7HMxdE",
+    "Content-Type": "application/json",
+}
+
+BOILER_MODEL_ID = "62bb0fe3dc3e0a00106db636"
+GENERATOR_MODEL_ID = "62bb406edc3e0a00106db6fd"
+ENGINE_MODEL_ID = "62bb4538dc3e0a00106db702"
+
+
+def save_to_csv(filename, columns, add_to):
+    try:
+        data_frame = pd.read_csv(filename)
+    except FileNotFoundError:
+        data_frame = pd.DataFrame(columns=columns)
+
+    data_frame = data_frame.append(add_to, ignore_index=True)
+    data_frame.to_csv(filename, index=False)
+
+
+def get_item(model_id, item_id=None):
+    if item_id:
+        object = requests.get(
+            "http://dev.rightech.io/api/v1/objects/" + item_id, headers=HEADERS
+        )
+        object = json.loads(object.text)
+        return object
+    objects = requests.get("http://dev.rightech.io/api/v1/objects", headers=HEADERS)
+    objects = json.loads(objects.text)
+    objects = list(
+        filter(lambda item: True if item["model"] == model_id else False, objects)
+    )
+    obj = random.choice(objects)
+    state = obj["state"]
+    state["_id"] = obj["_id"]
+    return state
 
 
 class CurrentBoiler:
@@ -16,6 +55,7 @@ class CurrentBoiler:
 
     def __init__(
         self,
+        _id,
         boiler_load,
         steam_pressure,
         fuel,
@@ -23,7 +63,9 @@ class CurrentBoiler:
         feed_pump_pressure,
         fuel_pressure,
         circulatory_pump_pressure,
+        **kwargs,
     ):
+        self._id = _id
         self.boiler_load = boiler_load
         self.steam_pressure = steam_pressure
         self.fuel = fuel
@@ -64,50 +106,12 @@ class CurrentBoiler:
         return dict_repr
 
     def reload(self):
-        prct_list = list(range(1, 25, 1))
-        pls_min = [1, -1]
-
-        self.boiler_load += int(
-            random.choice(prct_list)
-            * 0.01
-            * (random.choice(pls_min) if self.boiler_load < 100 else -1)
-            * self.boiler_load
-        )
-        self.fuel = round(
-            self.fuel
-            + (random.choice(prct_list) * 0.01 * random.choice(pls_min) * self.fuel),
-            3,
-        )
-        self.feed_pump_pressure = round(
-            self.feed_pump_pressure
-            + (
-                random.choice(prct_list)
-                * 0.01
-                * random.choice(pls_min)
-                * self.feed_pump_pressure
-            ),
-            3,
-        )
-        self.fuel_pressure = round(
-            self.fuel_pressure
-            + (
-                random.choice(prct_list)
-                * 0.01
-                * random.choice(pls_min)
-                * self.fuel_pressure
-            ),
-            3,
-        )
-        self.circulatory_pump_pressure = round(
-            self.circulatory_pump_pressure
-            + (
-                random.choice(prct_list)
-                * 0.01
-                * random.choice(pls_min)
-                * self.circulatory_pump_pressure
-            ),
-            3,
-        )
+        new_data = get_item(BOILER_MODEL_ID, item_id=self._id)["state"]
+        self.boiler_load = new_data["boiler_load"]
+        self.fuel = new_data["fuel"]
+        self.feed_pump_pressure = new_data["feed_pump_pressure"]
+        self.fuel_pressure = new_data["fuel_pressure"]
+        self.circulatory_pump_pressure = new_data["circulatory_pump_pressure"]
 
 
 class Boiler:
@@ -194,6 +198,7 @@ class CurrentGenerator:
 
     def __init__(
         self,
+        _id,
         amperage,
         fuel,
         temp,
@@ -207,7 +212,9 @@ class CurrentGenerator:
         consump_water,
         temp_cold_water_in,
         temp_cold_water_out,
+        **kwargs,
     ):
+        self._id = _id
         self.amperage = amperage
         self.fuel = fuel
         self.temp = temp
@@ -272,102 +279,20 @@ class CurrentGenerator:
         return dict_repr
 
     def reload(self):
-        prct_list = list(range(1, 25, 1))
-        pls_min = [1, -1]
-        self.amperage += int(
-            random.choice(prct_list) * 0.01 * random.choice(pls_min) * self.amperage
-        )
-        self.fuel += int(
-            random.choice(prct_list) * 0.01 * random.choice(pls_min) * self.fuel
-        )
-        self.temp = round(
-            self.temp
-            + (random.choice(prct_list) * 0.01 * random.choice(pls_min) * self.temp),
-            3,
-        )
-        self.exit_gas_temp = list(
-            map(
-                lambda x: round(
-                    x + random.choice(prct_list) * 0.01 * random.choice(pls_min) * x, 2
-                ),
-                self.exit_gas_temp,
-            )
-        )
-        self.average_temp_exit = round(
-            self.average_temp_exit
-            + (
-                random.choice(prct_list)
-                * 0.01
-                * random.choice(pls_min)
-                * self.average_temp_exit
-            ),
-            3,
-        )  #
-        self.combustion_pressure = list(
-            map(
-                lambda x: round(
-                    x + random.choice(prct_list) * 0.01 * random.choice(pls_min) * x, 2
-                ),
-                self.combustion_pressure,
-            )
-        )
-        self.cold_water_of = round(
-            self.cold_water_of
-            + (
-                random.choice(prct_list)
-                * 0.01
-                * random.choice(pls_min)
-                * self.cold_water_of
-            ),
-            3,
-        )
-        self.cold_water_exit = round(
-            self.cold_water_exit
-            + (
-                random.choice(prct_list)
-                * 0.01
-                * random.choice(pls_min)
-                * self.cold_water_exit
-            ),
-            3,
-        )
-        self.pressure = round(
-            self.pressure
-            + (
-                random.choice(prct_list) * 0.01 * random.choice(pls_min) * self.pressure
-            ),
-            3,
-        )  #
-        self.consump_water = round(
-            self.consump_water
-            + (
-                random.choice(prct_list)
-                * 0.01
-                * random.choice(pls_min)
-                * self.consump_water
-            ),
-            3,
-        )
-        self.temp_cold_water_in = round(
-            self.temp_cold_water_in
-            + (
-                random.choice(prct_list)
-                * 0.01
-                * random.choice(pls_min)
-                * self.temp_cold_water_in
-            ),
-            3,
-        )
-        self.temp_cold_water_out = round(
-            self.temp_cold_water_out
-            + (
-                random.choice(prct_list)
-                * 0.01
-                * random.choice(pls_min)
-                * self.temp_cold_water_out
-            ),
-            3,
-        )
+        new_data = get_item(BOILER_MODEL_ID, item_id=self._id)["state"]
+        self.amperage = new_data["amperage"]
+        self.fuel = new_data["fuel"]
+        self.temp = new_data["temp"]
+        self.exit_gas_temp = new_data["exit_gas_temp"]
+        self.average_temp_exit = new_data["average_temp_exit"]
+        self.compression_pressure = new_data["compression_pressure"]
+        self.combustion_pressure = new_data["combustion_pressure"]
+        self.cold_water_of = new_data["cold_water_of"]
+        self.cold_water_exit = new_data["cold_water_exit"]
+        self.pressure = new_data["pressure"]
+        self.consump_water = new_data["consump_water"]
+        self.temp_cold_water_in = new_data["temp_cold_water_in"]
+        self.temp_cold_water_out = new_data["temp_cold_water_out"]
 
 
 class Generator:
@@ -560,20 +485,21 @@ class CurrentEngine:
     columns = [
         "Время",
         "Engine speed",
-        "speed tc",
+        "Speed tc",
         "HT coll water engine inlet",
         "ET- cool water charge air",
-        "control air",
-        "lube oil engine",
-        "nozzle cool water",
-        "charge air",
-        "starting air",
-        "lube oil TC",
-        "fuel oil",
+        "Control air",
+        "Lube oil engine",
+        "Nozzle cool water",
+        "Charge air",
+        "Starting air",
+        "Lube oil TC",
+        "Fuel oil",
     ]
 
     def __init__(
         self,
+        _id,
         engine_speed,
         speed_tc,
         water_engine_inlect,
@@ -585,7 +511,9 @@ class CurrentEngine:
         starting_air,
         lube_oil_tc,
         fuel_oil,
+        **kwargs,
     ):
+        self._id = _id
         self.engine_speed = engine_speed
         self.speed_tc = speed_tc
         self.water_engine_inlect = water_engine_inlect
@@ -600,16 +528,16 @@ class CurrentEngine:
 
     def __repr__(self):
         return """Engine speed: {0} rpm
-speed tc: {1} tc
+Speed tc: {1} tc
 HT coll water engine inlet {2} bar
 ET- cool water charge air: {3} bar
-control air: {4} bar
-lube oil engine: {5} bar
-nozzle cool water: {6} bar
-charge air: {7} bar
-starting air: {8} bar
-lube oil TC: {9} bar
-fuel oil: {10} bar
+Control air: {4} bar
+Lube oil engine: {5} bar
+Nozzle cool water: {6} bar
+Charge air: {7} bar
+Starting air: {8} bar
+Lube oil TC: {9} bar
+Fuel oil: {10} bar
 """.format(
             self.engine_speed,
             self.speed_tc,
@@ -628,119 +556,31 @@ fuel oil: {10} bar
         dict_repr = {
             "Время": time,
             "Engine speed": self.engine_speed,
-            "speed tc": self.speed_tc,
+            "Speed tc": self.speed_tc,
             "HT coll water engine inlet": self.water_engine_inlect,
             "ET- cool water charge air": self.water_charge_air,
-            "control air": self.control_air,
-            "lube oil engine": self.lube_oil_engine,
-            "nozzle cool water": self.nozzle_cool_water,
-            "charge air": self.charge_air,
-            "starting air": self.starting_air,
-            "lube oil TC": self.lube_oil_tc,
-            "fuel oil": self.fuel_oil,
+            "Control air": self.control_air,
+            "Lube oil engine": self.lube_oil_engine,
+            "Nozzle cool water": self.nozzle_cool_water,
+            "Charge air": self.charge_air,
+            "Starting air": self.starting_air,
+            "Lube oil TC": self.lube_oil_tc,
+            "Fuel oil": self.fuel_oil,
         }
         return dict_repr
 
     def reload(self):
-        prct_list = list(range(1, 6, 1))
-        prct_list2 = list(range(1, 42, 1))
-        pls_min = [1, -1]
-        self.engine_speed += int(
-            random.choice(prct_list) * 0.01 * random.choice(pls_min) * self.engine_speed
-        )
-        self.speed_tc += int(
-            random.choice(prct_list) * 0.01 * random.choice(pls_min) * self.speed_tc
-        )
-        self.water_engine_inlect = round(
-            self.water_engine_inlect
-            + (
-                random.choice(prct_list2)
-                * 0.01
-                * random.choice(pls_min)
-                * self.water_engine_inlect
-            ),
-            3,
-        )
-        self.water_charge_air = round(
-            self.water_charge_air
-            + (
-                random.choice(prct_list2)
-                * 0.01
-                * random.choice(pls_min)
-                * self.water_charge_air
-            ),
-            3,
-        )
-        self.control_air = round(
-            self.control_air
-            + (
-                random.choice(prct_list)
-                * 0.01
-                * random.choice(pls_min)
-                * self.control_air
-            ),
-            3,
-        )
-        self.lube_oil_engine = round(
-            self.lube_oil_engine
-            + (
-                random.choice(prct_list)
-                * 0.01
-                * random.choice(pls_min)
-                * self.lube_oil_engine
-            ),
-            3,
-        )
-        self.nozzle_cool_water = round(
-            self.nozzle_cool_water
-            + (
-                random.choice(prct_list2)
-                * 0.01
-                * random.choice(pls_min)
-                * self.nozzle_cool_water
-            ),
-            3,
-        )
-        self.charge_air = round(
-            self.charge_air
-            + (
-                random.choice(prct_list2)
-                * 0.01
-                * random.choice(pls_min)
-                * self.charge_air
-            ),
-            3,
-        )
-        self.starting_air = round(
-            self.starting_air
-            + (
-                random.choice(prct_list)
-                * 0.01
-                * random.choice(pls_min)
-                * self.starting_air
-            ),
-            3,
-        )
-        self.lube_oil_tc = round(
-            self.lube_oil_tc
-            + (
-                random.choice(prct_list)
-                * 0.01
-                * random.choice(pls_min)
-                * self.lube_oil_tc
-            ),
-            3,
-        )
-        self.fuel_oil = round(
-            self.fuel_oil
-            + (
-                random.choice(prct_list2)
-                * 0.01
-                * random.choice(pls_min)
-                * self.fuel_oil
-            ),
-            3,
-        )
+        new_data = get_item(ENGINE_MODEL_ID, item_id=self._id)["state"]
+        self.engine_speed = new_data["engine_speed"]
+        self.speed_tc = new_data["speed_tc"]
+        self.water_engine_inlect = new_data["water_engine_inlect"]
+        self.control_air = new_data["control_air"]
+        self.lube_oil_engine = new_data["lube_oil_engine"]
+        self.nozzle_cool_water = new_data["nozzle_cool_water"]
+        self.charge_air = new_data["charge_air"]
+        self.starting_air = new_data["starting_air"]
+        self.lube_oil_tc = new_data["lube_oil_tc"]
+        self.fuel_oil = new_data["fuel_oil"]
 
 
 class Engine:
@@ -936,13 +776,3 @@ class Cargo:
             self.fuel,
             self.fuel_weight,
         )
-
-
-def save_to_csv(filename, columns, add_to):
-    try:
-        data_frame = pd.read_csv(filename)
-    except FileNotFoundError:
-        data_frame = pd.DataFrame(columns=columns)
-
-    data_frame = data_frame.append(add_to, ignore_index=True)
-    data_frame.to_csv(filename, index=False)

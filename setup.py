@@ -3,8 +3,7 @@ from cx_Freeze import setup, Executable
 
 # Dependencies are automatically detected, but it might need fine tuning.
 build_exe_options = {
-    "packages": ["os", "random", "tkinter", "PIL"],
-    "excludes": ["tkinter", "PIL"],
+    "packages": ["os", "random", "tkinter", "PIL", "requests", "json"],
 }
 
 # GUI applications require a different base on Windows (the default is for
@@ -15,7 +14,7 @@ if sys.platform == "win32":
 
 setup(
     name="ShipProject",
-    version="0.1",
+    version="0.2",
     description="smth",
     options={"build_exe": build_exe_options},
     executables=[Executable("app.py", base=base)],

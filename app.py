@@ -6,23 +6,8 @@ from ship_classes import *
 from tkinter import filedialog as fd
 from datetime import datetime
 
-current_engine = CurrentEngine(90, 13600, 2.8, 3.2, 6, 4.3, 3.8, 1.9, 22, 1.3, 7.4)
-
-current_generator = CurrentGenerator(
-    50,
-    481,
-    84.3,
-    [230, 230, 235, 235, 225, 230],
-    230.8,
-    [35, 35, 35, 35, 35, 35],
-    [89, 91, 89, 89, 89, 90],
-    3.3,
-    2.2,
-    1.1,
-    1.8,
-    74,
-    71,
-)
+current_engine = CurrentEngine(**get_item(ENGINE_MODEL_ID))
+current_generator = CurrentGenerator(**get_item(GENERATOR_MODEL_ID))
 diesel = Diesel(
     "6L23/30H",
     225,
@@ -43,7 +28,7 @@ diesel = Diesel(
 )
 generator = Generator("HYNDAY HFC6 506-14E", 750, 450, 1202.81, 60, 96, 0.8)
 
-current_boiler = CurrentBoiler(50, 16, 933, 60, 260, 7.8, 47)
+current_boiler = CurrentBoiler(**get_item(BOILER_MODEL_ID))
 
 
 captain = CrewMember(
